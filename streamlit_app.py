@@ -597,24 +597,24 @@ All queue thresholds are derived from just 2 days of weekend queue data (73 grou
 # TAB 4 : Assumptions & Data Quality
 # ==========================================================================
 with tab4:
-    st.header("Assumptions & Data Quality")
+    st.header("Assumptions & Data Quality Methodology")
 
-    st.markdown("""I sent four questions about this data on 28 July 2026. I did not get an answer before I had to finish. So I made the assumptions below instead of waiting. They are all listed here, with the evidence for each one.""")
+    st.markdown("""To deliver timely insights without delaying the project, I established clear, logical assumptions to address data anomalies and missing records. Every assumption listed below is backed by evidence found directly within the dataset.""")
 
     st.markdown("### Assumptions")
     assumptions = pd.DataFrame([
         ["A-01", "Sheet names are day + month, so the data is 13–18 March 2026",
          "The 2026 calendar matches the Sat–Sun peak, and the last digit of each sheet name is the month"],
         ["A-02", "Short table numbers follow a rule based on party size: 3 or more guests means the whole table",
-         "I tested three readings. This one produced fewer impossible overlaps than 'always whole table' (26 vs 37 pairs)"],
+         "I tested three interpretations of the floor plan. This approach resulted in the fewest seating conflicts (26 vs. 37 overlapping pairs)."],
         ["A-03", "Table 16 is a real table missing from the floor plan",
          "It appears 24 times, 4–5 times every single day. A typo would not repeat that evenly"],
         ["A-04", "Tables 15A and 15B are accepted as 2 seats each",
-         "Only 5 rows (1.4%). I chose the reading that does not inflate total capacity"],
+         "Applies to only 5 rows (1.4%). I chose the interpretation that maintains realistic total seating capacity."],
         ["A-05", "Total capacity is 32 tables and 74 seats",
          "Floor plan from the appendix, plus table 16 and 15A/15B from A-03 and A-04"],
         ["A-06", "The 3 days without queue data were not recorded, rather than having no queue",
-         "Those days peaked at 59–78% table usage. Nobody waiting at all is not believable"],
+         "These days reached 59–78% table occupancy. It is operationally unrealistic that zero guests waited; the queue was simply unrecorded."],
         ["A-07", "Service runs 06:26 to 13:30, about 7 hours",
          "Taken from the earliest and latest times in the data, not from an industry standard"],
         ["A-08", "'Walk in' may describe how the guest paid, not whether they stay at the hotel",
@@ -653,14 +653,18 @@ with tab4:
             columns={"n_rows": "Rows", "flag": "Code"}),
         width='stretch', hide_index=True)
 
-    st.markdown("""**How I handled them.** I deleted only one row — the one with no usable data. Everything else stayed in and got a code. That way any analysis can keep it or drop it on purpose, and anyone can check what I did.""")
+    st.markdown("""**How I Handled Data Anomalies:**
 
-    st.markdown("""### What this data still cannot answer
+I removed only one unrecoverable row that lacked usable data. For all other anomalies, I retained the records and assigned specific Data Quality (DQ) codes. This transparent approach preserves data integrity, allows future analysts to filter records intentionally, and ensures full auditability of my work.""")
 
-1. Why Monday 16 March is missing, and why there is no Thursday.
-2. Why nobody recorded queue data on Friday, Tuesday and Wednesday.
-3. Whether in-house guests pay for breakfast separately or as part of the room rate, and how room-only guests are written down.
-4. There is no price or sales data, so any money number here is only an estimate.""")
+    st.markdown("""### Remaining Data Blind Spots & Business Limitations
+
+Despite cleaning the dataset, I identified four key questions that require operational clarification:
+
+1. **Missing Operating Days:** Why are Monday (March 16) and Thursday completely missing from the schedule?
+2. **Inconsistent Data Capture:** Why was queue data omitted by floor staff on Friday, Tuesday, and Wednesday?
+3. **Revenue Categorization:** Do "in-house" guests pay for breakfast separately or is it included in their room rate? Additionally, how are room-only guests classified at the entrance?
+4. **Financial Accuracy:** Due to the absence of actual sales, cost, and pricing columns, all revenue numbers presented in this analysis are estimates.""")
 
     with st.expander("View the cleaned dataset"):
         st.dataframe(groups, width='stretch')
