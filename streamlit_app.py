@@ -126,7 +126,7 @@ with tab0:
     c1.metric("Groups served", f"{len(groups):,}")
     c2.metric("Total guests", f"{groups['pax'].sum():,.0f}")
     c3.metric("Median dining time", f"{groups['duration_min_clean'].median():.0f} min")
-    c4.metric("Seating capacity", f"{TOTAL_UNITS} units · {TOTAL_SEATS} seats")
+    c4.metric("Seating capacity", f"{TOTAL_UNITS} tables · {TOTAL_SEATS} seats")
 
     st.markdown("### Important Notes Before the Charts")
     # เอาข้อจำกัดขึ้นก่อนกราฟ เพราะถ้าคนเห็นกราฟก่อน จะตีความเกินกว่าที่ข้อมูลรองรับ
@@ -236,7 +236,7 @@ So the wait is not the problem. In-house guests just give up faster. They alread
     fig.add_hline(y=75, line_dash="dash", line_color=RED,
                   annotation_text="75% — a restaurant starts to feel full here")
     fig.update_layout(barmode="group", title="Table usage by day (%)",
-                      yaxis_title="% of 32 seating units", xaxis_title="")
+                      yaxis_title="% of 32 tables", xaxis_title="")
     st.plotly_chart(fig, width='stretch')
 
     c1, c2 = st.columns([2, 1])
@@ -535,10 +535,10 @@ The reason is simple. A table that looks empty is not ready yet. Someone still h
     st.markdown("## Plan B — keep 6 tables free for hotel guests during the rush")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Tables to keep free", "6 units", delta="18.8% of 32", delta_color="off")
-    c2.metric("What hotel guests really used", "6 units",
+    c1.metric("Tables to keep free", "6 tables", delta="18.8% of 32", delta_color="off")
+    c2.metric("What hotel guests really used", "6 tables",
               delta="same on Sat and Sun", delta_color="off")
-    c3.metric("Still free for walk-ins", "26 units", delta="they never used more than 23",
+    c3.metric("Still free for walk-ins", "26 tables", delta="they never used more than 23",
               delta_color="off")
 
     st.markdown("""**When to use Plan B instead.** If room-only guests really are written down as *Walk in*, then Plan A cannot work. Staff would have no way to know who is a hotel guest. Those guests would go to the back of the queue, and then complain at the front desk.
@@ -573,7 +573,7 @@ with tab4:
          "It appears 24 times, 4–5 times every single day. A typo would not repeat that evenly"],
         ["A-04", "Tables 15A and 15B are accepted as 2 seats each",
          "Only 5 rows (1.4%). I chose the reading that does not inflate total capacity"],
-        ["A-05", "Total capacity is 32 seating units and 74 seats",
+        ["A-05", "Total capacity is 32 tables and 74 seats",
          "Floor plan from the appendix, plus table 16 and 15A/15B from A-03 and A-04"],
         ["A-06", "The 3 days without queue data were not recorded, rather than having no queue",
          "Those days peaked at 59–78% table usage. Nobody waiting at all is not believable"],
