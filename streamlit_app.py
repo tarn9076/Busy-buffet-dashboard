@@ -471,9 +471,9 @@ with tab3:
 
     st.markdown("""### Keep Action 3, but only turn it on when it is needed
 
-Of the three actions, this is the only one that matches a real problem in the data. In-house guests leave the queue 28% of the time, even though they wait less than walk-ins. The other two actions try to fix problems the data does not find.""")
+**Why I focused on Action 3:** Of the three proposed actions, this is the only one that addresses a real operational issue in the data. In-house guests abandon the queue 28% of the time, even though their median wait is shorter than walk-ins. The other two actions try to solve problems that the data does not support.""")
 
-    st.markdown("### First, the idea I dropped")
+    st.markdown("### Choosing the right trigger")
 
     day_pick = st.selectbox("Pick a day", ["Sun 15 Mar", "Sat 14 Mar"], index=0)
     occ = occupancy_curve(day_pick)
@@ -501,11 +501,13 @@ Of the three actions, this is the only one that matches a real problem in the da
                      tickvals=[hhmm(m) for m in range(6 * 60, 14 * 60, 60)])
     st.plotly_chart(fig, width='stretch')
 
-    st.error("""**My first idea was to turn the rule on at 80% table usage. The data proved me wrong.**
+    st.error("""**Why I dropped the 80% Table Usage trigger:**
 
-At 09:00 on Sunday, 15 groups are waiting. But table usage shows 71.9%, so the rule stays **off**. At 11:30 usage shows 81.2% and the rule turns **on**, but only 1 group is still waiting.
+**My initial assumption:** I considered activating priority seating whenever table occupancy hit 80%. However, the data disproved this approach.
 
-The reason is simple. A table that looks empty is not ready yet. Someone still has to clear it, wipe it and set it again.""")
+**The data mismatch:** At 09:00 on Sunday, 15 groups were waiting, but table usage showed only 71.9% (so the rule would stay OFF). At 11:30, usage showed 81.2% (rule turns ON), but only 1 group was waiting.
+
+**The operational reality:** A table that appears "empty" in the system is often not ready for seating. Staff still need time to clear, clean, and reset the table (turnover lag). Therefore, table occupancy percentage is a poor trigger for queue management.""")
 
     st.divider()
     st.markdown("## Plan A — turn it on when 5 or more groups are waiting")
@@ -545,12 +547,19 @@ The reason is simple. A table that looks empty is not ready yet. Someone still h
         st.metric("Second jump", "10 groups", delta="wait goes 4x: up to 45 min",
                   delta_color="off")
 
-    st.markdown("""**Why 5 and not another number.** I did not use the walk-away rate to pick it. Only 25 in-house groups ever waited, and 7 of them left. That is too small to trust. So I used the waiting time instead. It is steadier and it goes up smoothly. When the queue reaches 5 groups, the wait doubles from 11.5 to 22 minutes.
+    st.markdown("""**Why I selected a 5-group threshold:**
 
-**Why this works for the staff**
-- They can count queue cards by eye. No system and no maths.
-- It would turn on for 33 minutes on Saturday and 173 minutes on Sunday. The other three days need nothing.
-- It matches what guests see. Nobody can see a table usage percentage.""")
+**Why not use walk-away rates?** Only 25 in-house groups ever queued in the dataset, and 7 left. A sample size of 7 is too small for statistical confidence.
+
+**Using median wait time instead:** Wait time provides a much steadier trend. When the line reaches 5 groups, the median wait doubles from 11.5 to 22 minutes. When it hits 10 groups, the wait jumps 4x to 45 minutes. Therefore, 5 groups is the critical tipping point where intervention is needed.
+
+**Why Plan A works for Operations:**
+
+**Zero system reliance:** Hostesses can trigger this rule visually by counting physical queue cards — no math or software required.
+
+**Targeted activation:** Based on weekend data, this rule would only activate for 33 minutes on Saturday and 173 minutes on Sunday. On weekdays, it remains inactive.
+
+**Guest-facing clarity:** It reacts to what guests actually experience (length of the line), rather than an invisible table percentage.""")
 
     st.divider()
     st.markdown("## Plan B — keep 6 tables free for hotel guests during the rush")
@@ -562,18 +571,26 @@ The reason is simple. A table that looks empty is not ready yet. Someone still h
     c3.metric("Still free for walk-ins", "26 tables", delta="they never used more than 23",
               delta_color="off")
 
-    st.markdown("""**When to use Plan B instead.** If room-only guests really are written down as *Walk in*, then Plan A cannot work. Staff would have no way to know who is a hotel guest. Those guests would go to the back of the queue, and then complain at the front desk.
+    st.markdown("""**When to deploy Plan B instead:**
 
-Plan B avoids this. Nobody has to decide who is who at the door.
+**The identification barrier:** If front-of-house staff cannot easily distinguish room-only guests from external visitors at the door, Plan A will fail. Misidentified hotel guests would be sent to the back of the line, leading to front-desk complaints.
 
-**Why 6 tables.** That is the most tables in-house guests actually used between 08:30 and 11:00. It was 6 on Saturday and 6 on Sunday. That still leaves 26 tables for walk-ins, and they never used more than 23.""")
+**The operational solution:** Plan B bypasses door identification entirely by reserving a dedicated buffer of 6 tables for in-house breakfast guests during peak rush hours (08:30 – 11:00).
+
+**Why 6 tables?** My analysis shows that 6 tables (18.8% of capacity) is the maximum concurrent demand from in-house guests between 08:30 and 11:00 on both Saturday and Sunday. This still leaves 26 tables for walk-ins, who never exceeded 23 concurrent tables in the dataset.""")
 
     st.divider()
-    st.markdown("""### One warning before this starts
+    st.markdown("""### Data Limitation Note
 
-Every number here comes from **2 days of queue data and 73 groups**. It is the best starting point this data can give. It is not a final answer.
+All queue thresholds are derived from just 2 days of weekend queue data (73 groups total). While this provides the best analytical starting point available, it should be treated as a working baseline rather than a permanent rule.
 
-**What I would do:** try it for two weeks. Record queue data every day this time. Then set the number again properly. To check if it worked, compare against what we have now — 28% of in-house guests leaving the queue.""")
+**My Recommended Action Plan:**
+
+**Test & Iterate:** Implement Plan A (or Plan B) as a two-week operational pilot.
+
+**Data Collection:** Consistently record daily queue lengths and wait times during the trial.
+
+**Success Metric:** Evaluate success by comparing the new walk-away rate against our current 28% baseline for in-house guests, and refine the threshold accordingly.""")
 
 
 # ==========================================================================
