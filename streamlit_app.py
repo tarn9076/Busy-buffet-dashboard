@@ -128,13 +128,13 @@ with tab0:
     c3.metric("Median dining time", f"{groups['duration_min_clean'].median():.0f} min")
     c4.metric("Seating capacity", f"{TOTAL_UNITS} units · {TOTAL_SEATS} seats")
 
-    st.markdown("### Read this before the charts")
+    st.markdown("### Important Notes Before the Charts")
     # เอาข้อจำกัดขึ้นก่อนกราฟ เพราะถ้าคนเห็นกราฟก่อน จะตีความเกินกว่าที่ข้อมูลรองรับ
-    st.markdown("""**The data has three big holes. They change every answer below.**
+    st.markdown("""I found three main limitations in the data that affect the analysis below:
 
-1. **We only have 5 days, not 7.** Monday 16 March is missing. There is no Thursday at all. So we cannot talk about a full week.
-2. **Queue data exists for only 2 days** — Saturday 14 and Sunday 15. On the other 3 days the queue columns are empty. So every number about waiting comes from those 2 days.
-3. **There is no price or sales column.** So we cannot measure how guests react to price.""")
+1. **Incomplete week:** I only have data for 5 days instead of 7 (Monday, March 16, and Thursday are missing). Therefore, I cannot evaluate a full weekly trend.
+2. **Limited queue data:** Queue data is only available for 2 days (Saturday 14 and Sunday 15). All waiting-time insights are based solely on these two days.
+3. **Missing financial data:** There are no price or sales columns, so I cannot measure how guests react to pricing.""")
 
     st.divider()
     st.markdown("### How busy was each day")
