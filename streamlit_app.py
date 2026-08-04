@@ -142,21 +142,26 @@ with tab0:
     day_sum = (groups.groupby("day")
                .agg(n_groups=("service_no", "size"), n_pax=("pax", "sum"))
                .reindex(DAY_ORDER).reset_index())
-    day_sum["queue_data"] = day_sum["day"].map(
-        groups.groupby("day")["queue_data_available"].first())
-    # บอกในกราฟเลยว่าวันไหนมีข้อมูลคิว จะได้ไม่ต้องอธิบายซ้ำ
-    day_sum["note"] = np.where(day_sum["queue_data"],
-                               "Queue data available", "No queue data")
+    # แบ่งสีตาม weekday / weekend เพราะนี่คือสิ่งที่เราอยากให้คนเห็นความต่าง
+    day_sum["type"] = day_sum["day"].map(
+        groups.groupby("day")["is_weekend"].first()).map(
+        {True: "Weekend", False: "Weekday"})
 
-    fig = px.bar(day_sum, x="day", y="n_pax", text="n_pax", color="note",
-                 color_discrete_map={"Queue data available": "#2E9E5B",
-                                     "No queue data": "#9AA0A6"},
+    # ต้องใส่ category_orders เสมอเมื่อใช้ color แบ่งกลุ่ม
+    # เพราะ plotly จะวาดทีละกลุ่มสี ทำให้แกน x เรียงตามสี ไม่ใช่ตามวันที่
+    fig = px.bar(day_sum, x="day", y="n_pax", text="n_pax", color="type",
+                 category_orders={"day": DAY_ORDER,
+                                  "type": ["Weekday", "Weekend"]},
+                 color_discrete_map={"Weekday": "#B8D8E8", "Weekend": "#2E86AB"},
                  title="Guests per day",
-                 labels={"day": "", "n_pax": "Guests", "note": ""})
+                 labels={"day": "", "n_pax": "Guests", "type": ""})
     fig.update_traces(textposition="outside")
     st.plotly_chart(fig, width='stretch')
 
-    st.markdown("""Weekends bring about **160 guests a day**. Weekdays bring about **114**. That is 40% more. The week is not the same every day.""")
+    st.markdown("""Weekend demand is 40% higher than weekdays (averaging **160** vs. **114** guests per day). This clear jump means we need different staffing and table preparation for weekends.""")
+
+    st.caption(
+        "Note: queue data was only recorded on Saturday 14 and Sunday 15.")
 
 
 # ==========================================================================
@@ -170,7 +175,7 @@ with tab1:
     st.markdown(
         "> *In-house guests are unhappy that they have to wait for a table. "
         "Walk-in customers also queue for a long time and leave.*")
-    st.markdown("### Answer: True — but the reason is not what staff think")
+    st.markdown("### Answer: True — but the root cause is guest expectation, not just wait time")
 
     q = groups[(groups["queue_data_available"]) & (groups["has_queue"])]
     t = (q.groupby("guest_type")
@@ -197,9 +202,13 @@ with tab1:
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, width='stretch')
 
-    st.error("""**The two charts say opposite things.** In-house guests wait **less** than walk-ins — 28 minutes against 42.5. But they leave the queue **almost twice as often** — 28.0% against 14.6%.
+    st.error("""**My Analysis & Key Takeaway:**
 
-So the wait is not the problem. In-house guests just give up faster. They already paid for a room, so they expect a table. This is about what guests expect, not about how many tables we have.""")
+The data reveals an interesting contrast: In-house guests wait much less than walk-ins (28 mins vs. 42.5 mins median), yet they abandon the queue almost twice as often (28.0% walk-away rate vs. 14.6%).
+
+**Why this happens (Operational & Commercial view):** Wait time itself is not the main problem. In-house guests have already paid for their rooms, so they expect immediate seating for breakfast. They simply have a much lower wait tolerance than walk-in visitors.
+
+**Conclusion:** This is an expectation management issue, not a table capacity issue.""")
 
     st.dataframe(
         t.rename(columns={"guest_type": "Guest type", "queued": "Groups queued",
@@ -214,7 +223,7 @@ So the wait is not the problem. In-house guests just give up faster. They alread
     st.markdown(
         "> *We are very busy every day of the week. This buffet business is not "
         "possible for this hotel.*")
-    st.markdown("### Answer: False — for the 5 days we can check")
+    st.markdown("### Answer: False — based on the 5 days of available data")
 
     rows = []
     for d in DAY_ORDER:
@@ -241,13 +250,13 @@ So the wait is not the problem. In-house guests just give up faster. They alread
 
     c1, c2 = st.columns([2, 1])
     with c1:
-        st.markdown("""**Friday and Tuesday never reach 75%. Not for one minute.**
+        st.markdown("""**My Findings on Table Utilization:**
 
-- Friday sits at **26.8%** on average. Half the room is empty for 5.5 hours.
-- Tuesday sits at **37.9%**.
-- Only Sunday touches 90%, and only for **3 minutes**.
+**Weekdays are under-utilized:** Friday and Tuesday never reach our 75% busy threshold. On average, Friday sits at only 26.8% occupancy, meaning half the restaurant remains empty for 5.5 hours.
 
-The restaurant does get crowded. But it happens on **Saturday and Sunday, between 09:00 and 10:30**. Not every day.""")
+**Peak crowding is temporary:** Sunday touches 90% occupancy, but only for 3 minutes.
+
+**When we are actually busy:** The restaurant only experiences true crowding on Saturday and Sunday between 09:00 and 10:30, not every day.""")
     with c2:
         st.dataframe(
             occ_tbl.rename(columns={"day": "Day", "peak_pct": "Peak %",
@@ -255,7 +264,7 @@ The restaurant does get crowded. But it happens on **Saturday and Sunday, betwee
                                     "min_over75": "Min above 75%"}),
             width='stretch', hide_index=True)
 
-    st.caption("""One limit: we only have 5 of the 7 days. We can say these 5 days are not the same. We cannot say anything about Monday or Thursday.""")
+    st.caption("""**Data Limitation Note:** I only have data for 5 out of 7 days. While I can clearly see that daily demand varies significantly, I cannot draw conclusions about Monday or Thursday.""")
 
     st.divider()
 
@@ -264,7 +273,7 @@ The restaurant does get crowded. But it happens on **Saturday and Sunday, betwee
     st.markdown(
         "> *Walk-in customers sit the whole day. It is very difficult to find seats "
         "for in-house customers.*")
-    st.markdown("### Answer: False — but staff did notice something real")
+    st.markdown("### Answer: False — but staff correctly noticed a difference in dining behavior")
 
     dur = groups.dropna(subset=["duration_min_clean"])
 
@@ -287,17 +296,21 @@ The restaurant does get crowded. But it happens on **Saturday and Sunday, betwee
         st.metric("Median stay", "52 min", delta="17% of the 5 hours allowed",
                   delta_color="off")
 
-    st.markdown("""**The restaurant is only open for 7 hours — 06:26 to 13:30.**
+    st.markdown("""**The Reality of Dining Duration:**
 
-- The 5-hour rule covers **71% of the whole opening time**.
-- To use all 5 hours, a guest has to arrive before **08:30**. Only 40.5% of guests arrive that early.
-- The longest real stay used only **75%** of the 5 hours. Only **8 guests (2.3%)** used more than half.
+The restaurant is open for 7 hours (06:26 to 13:30), meaning a 5-hour dining limit covers 71% of our total opening time.
 
-Sitting *the whole day* is not possible here. Nobody even came close.""")
+To even attempt a 5-hour stay, a guest must arrive before 08:30 (only 40.5% of guests arrive that early).
 
-    st.warning("""**What staff got right:** walk-ins do stay longer. **66 minutes** against **38.5 minutes** for in-house guests. That is 1.7 times longer. They also use **70% of all table time**, but they are only 57% of the groups.
+**Nobody stayed the whole day:** The longest individual stay in the entire dataset was 225 minutes (3 hours 45 minutes). Only 8 guests (2.3%) stayed longer than 2.5 hours.""")
 
-Staff saw the right thing. They just made it much bigger than it is.""")
+    st.success("""**What Staff Correctly Observed:**
+
+Walk-in guests do stay 1.7 times longer than in-house guests (median 66 minutes vs. 38.5 minutes).
+
+While walk-in groups make up only 57% of total groups, they consume 70% of total table-minutes.
+
+**Conclusion:** Staff accurately sensed that walk-ins occupy tables longer and slow down table turnover, but the perception that they "sit the whole day" is an exaggeration.""")
 
     share = (units.dropna(subset=["duration_min_clean"])
              .groupby("guest_type")["duration_min_clean"].sum().reset_index())
