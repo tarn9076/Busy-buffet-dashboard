@@ -328,7 +328,7 @@ with tab2:
 
     # ---------------- ACTION 1 ----------------
     st.markdown("## Action 1 — Cut the seating time from 5 hours")
-    st.markdown("### It fixes a problem we do not have")
+    st.markdown("### It tries to solve a problem that does not exist")
 
     d = groups["duration_min_clean"].dropna()
     caps = [300, 240, 180, 120, 90, 60]
@@ -351,9 +351,11 @@ with tab2:
                                    "pct_affected": "%"}),
             width='stretch', hide_index=True)
 
-    st.markdown("""**Cutting from 5 hours to 4 hours changes nothing.** Nobody stays that long.
+    st.markdown("""**Why this fails (Operational View):**
 
-The limit has to drop to **90 minutes** before anything happens. And that would push out 59 groups — 17% of all guests.""")
+Reducing the limit from 5 to 4 hours has zero impact. My analysis shows that no one stays that long anyway.
+
+To actually free up tables, I would have to drop the time limit drastically to 90 minutes, which would negatively affect 59 groups (17% of all guests).""")
 
     # จำลองว่าถ้าบังคับ 90 นาที peak จะลดแค่ไหน
     sim = []
@@ -374,15 +376,15 @@ The limit has to drop to **90 minutes** before anything happens. And that would 
     fig.update_traces(textposition="outside")
     st.plotly_chart(fig, width='stretch')
 
-    st.markdown("""Even at 90 minutes, **Friday does not move at all**. It stays at 59.4%. Sunday only drops from 90.6% to 87.5%. That is very little, and we would lose one guest in six to get it.""")
+    st.markdown("""**Minimal results during peak hours:** Even with a strict 90-minute limit, Friday occupancy stays unchanged at 59.4%, and Sunday peak usage only drops slightly from 90.6% to 87.5%. Disrupting 1 in 6 guests for such a tiny gain is not worth the operational friction.""")
 
     st.divider()
 
     # ---------------- ACTION 2 ----------------
     st.markdown("## Action 2 — Raise the price to 259 every day")
-    st.markdown("### Too risky, and it hits the wrong days")
+    st.markdown("### Too risky for revenue, and it penalizes the wrong days")
 
-    st.markdown("""**First, something I cannot do.** The file has no price, sales or cost column. So I cannot measure how guests react to a price change. Instead I asked an easier question: *how many guests can we lose before we make less money?*""")
+    st.markdown("""**Note:** Since I do not have historical price elasticity or sales data, I calculated a break-even threshold instead: How many guests can we afford to lose before total revenue drops?""")
 
     walkin = groups[groups["guest_type"] == "Walk in"]
     be = []
@@ -413,17 +415,19 @@ The limit has to drop to **90 minutes** before anything happens. And that would 
                                "revenue": "Revenue now (THB)"}),
             width='stretch', hide_index=True)
 
-    st.markdown("""**Problem 1 — there is not much room for error.** On weekdays the price would jump **63%**, from 159 to 259. If more than **38.6%** of guests stop coming, we make less money. On weekends we can only lose **23.2%**.
+    st.markdown("""**Why this fails (Commercial View):**
 
-**Problem 2 — it hits the wrong days.** The biggest jump lands on weekdays. Those are the days when only **26.8% to 40.7%** of tables are used. We would charge more when half the room is empty. And Saturday and Sunday would still be crowded.""")
+**Problem 1: High financial risk.** Raising weekday prices from 159 to 259 THB (+63%) means if we lose more than 38.6% of weekday volume, we will actively lose money. On weekends, our margin for error is even tighter (23.2% max volume loss).
 
-    st.caption("""A note on method: weekend prices are 25% higher, and weekends are busier. This does not prove that guests ignore price. In this data, price and day of week always change together. So we cannot tell which one brought the guests in.""")
+**Problem 2: It targets the wrong days.** This price hike lands heaviest on weekdays when tables are already 59% to 73% empty. We would be charging more during our slowest periods, while failing to solve the overcrowding problem on weekends.""")
+
+    st.caption("""**Analytical Note:** Weekends are currently priced 25% higher and bring in more guests. However, because price and day-of-week always move together in this dataset, I cannot separate whether guests care more about the price or simply prefer weekend dining.""")
 
     st.divider()
 
     # ---------------- ACTION 3 ----------------
     st.markdown("## Action 3 — Let in-house guests skip the queue")
-    st.markdown("### The idea is fine, but it cannot be used every day")
+    st.markdown("### Good in theory, but impractical for daily operations")
 
     qdays = []
     for dd in DAY_ORDER:
@@ -444,15 +448,19 @@ The limit has to drop to **90 minutes** before anything happens. And that would 
                               "status": "Queue data"}),
         width='stretch', hide_index=True)
 
-    st.markdown("""**Reason 1 — on 3 of the 5 days there is no queue to skip.** Friday, Tuesday and Wednesday only reach 59–78% table usage. The rule would do nothing on those days.
+    st.markdown("""**Why this fails (Operational View):**
 
-**Reason 2 — it moves the problem, it does not fix it.** On Sunday, 19 in-house groups waited and 35 walk-in groups waited. If all the in-house groups jump ahead, walk-ins wait about 54% longer. We still have the same number of tables.
+**Reason 1: It is useless on weekdays.** On 3 out of 5 recorded days, there is no queue to skip. Table utilization only reaches 59–78%, so priority seating adds no value.
 
-**Reason 3 — staff cannot tell who is a hotel guest.** Someone who booked a room without breakfast, then buys the buffet at the door, is written down as *Walk in*. Staff at the door cannot see the difference.""")
+**Reason 2: It just shifts the bottleneck.** On Sunday, 19 in-house groups and 35 walk-in groups waited in line. If in-house guests skip ahead, walk-in wait times will jump by ~54%. Since our total table capacity remains the same, we do not solve the wait time — we only make it worse for walk-in visitors.
 
-    st.warning("""**Here is the evidence.** Between 06:00 and 06:59, people from outside the hotel have not arrived yet. But the data shows **21 Walk in groups and only 2 In house** — walk-ins are 91% of that hour.
+**Reason 3: Operations cannot easily identify guest types at the door.** A guest who booked a room without breakfast and pays at the door is recorded as a "Walk-in." Front-of-house staff cannot visually tell the difference during a busy rush.""")
 
-So in this data, *Walk in* probably means **how the guest paid**. It does not mean **the guest is not staying at the hotel**.""")
+    st.success("""**My Evidence from the Data:**
+
+Between 06:00 and 06:59 AM, outside visitors rarely arrive. Yet, the data shows 21 Walk-in groups and only 2 In-house groups during this early hour (Walk-ins = 91% of early arrivals).
+
+**Conclusion:** In this dataset, "Walk-in" likely indicates how the guest paid (e.g., paying at the door rather than pre-booking breakfast with the room), rather than whether they are actually staying at the hotel.""")
 
 
 # ==========================================================================
