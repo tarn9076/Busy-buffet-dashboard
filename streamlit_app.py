@@ -49,6 +49,7 @@ COLOR_GUEST = {"In house": "#2E86AB", "Walk in": "#F18F01"}
 RED = "#D64545"
 
 
+@st.cache_data
 def load():
     """โหลดไฟล์ที่ผ่าน cleaning pipeline (clean_data.py) มาแล้ว"""
     g = pd.read_csv("clean_groups.csv")
@@ -69,6 +70,7 @@ groups, units = load()
 # แล้วไล่ทุกกลุ่ม บวก +1 ลงในทุกนาทีที่โต๊ะถูกครอง
 # ทำแบบนี้เพราะคำถาม "ตอน 9 โมงมีกี่โต๊ะถูกใช้" ตอบได้ตรงกว่าการเฉลี่ยรายชั่วโมง
 
+@st.cache_data
 def occupancy_curve(day, cap_minutes=None):
     """คืน array 1440 ช่อง = จำนวนหน่วยโต๊ะที่ถูกครองในแต่ละนาที
     cap_minutes: ถ้าใส่ จะจำลองว่าบังคับให้ลุกภายในกี่นาที (ใช้ simulate Action 1)
@@ -85,6 +87,7 @@ def occupancy_curve(day, cap_minutes=None):
     return grid
 
 
+@st.cache_data
 def queue_curve(day):
     """คืน array 1440 ช่อง = จำนวนกลุ่มที่ยืนรออยู่ในคิวแต่ละนาที"""
     sub = groups[(groups["day"] == day) & (groups["has_queue"])].dropna(
@@ -246,11 +249,21 @@ Among {len(q)} queued groups, in-house guests had a median wait of **{ih['med_wa
                       yaxis_title="Occupied table units", xaxis_title="")
     st.plotly_chart(fig, width='stretch')
 
+    # ดึงตัวเลขจาก occ_tbl โดยตรง ไม่พิมพ์มือ
+    # เพราะข้อความกับตารางวางอยู่ข้างกันบนหน้าจอเดียวกัน ถ้าไม่ตรงกันจะเห็นทันที
+    _o = occ_tbl.set_index("day")
+
+    def _pk(day_name):
+        return int(_o.loc[day_name, "peak_units"])
+
+    def _av(day_name):
+        return _o.loc[day_name, "avg_units"]
+
     c1, c2 = st.columns([2, 1])
     with c1:
-        st.markdown("""**Primary evidence — occupied table units:**
+        st.markdown(f"""**Primary evidence — occupied table units:**
 
-Estimated occupied units were lower on Friday (**peak 19; average 8.6**) and Tuesday (**21; 12.1**) than Saturday (**26; 15.5**) and Sunday (**29; 18.0**). Wednesday was closer to weekend conditions (**peak 25; average 13.0**), so the pattern is not simply weekday versus weekend.
+Estimated occupied units were lower on Friday (**peak {_pk('Fri 13 Mar')}; average {_av('Fri 13 Mar')}**) and Tuesday (**{_pk('Tue 17 Mar')}; {_av('Tue 17 Mar')}**) than Saturday (**{_pk('Sat 14 Mar')}; {_av('Sat 14 Mar')}**) and Sunday (**{_pk('Sun 15 Mar')}; {_av('Sun 15 Mar')}**). Wednesday was closer to weekend conditions (**peak {_pk('Wed 18 Mar')}; average {_av('Wed 18 Mar')}**), so the pattern is not simply weekday versus weekend.
 
 Recorded queues and walk-aways are supporting evidence only because queue-capture consistency remains uncertain. Occupied units are shown as counts rather than utilization percentages because the appendix does not confirm total physical capacity.
 
@@ -621,21 +634,54 @@ with tab4:
 
 I removed only one unrecoverable row that lacked usable data. For all other anomalies, I retained the records and assigned specific Data Quality (DQ) codes. This transparent approach preserves data integrity, allows future analysts to filter records intentionally, and ensures full auditability of my work.""")
 
-    early_groups = groups[
-        (groups["meal_start_min"] >= 6 * 60) &
-        (groups["meal_start_min"] < 7 * 60)
-    ]
-    early_walkins = int((early_groups["guest_type"] == "Walk in").sum())
+    # นับกลุ่มที่เริ่มมื้อช่วง 06:00-06:59 เพื่อชี้ความผิดปกติของ label guest_type
+    #
+    # ทำไมต้องเขียนแบบเช็คคอลัมน์ก่อน:
+    # meal_start_min เป็นคอลัมน์ที่ทั้งไฟล์นี้ใช้กับ units เท่านั้น ไม่เคยใช้กับ groups
+    # ถ้า clean_groups.csv ไม่มีคอลัมน์นี้ แท็บทั้งแท็บจะพังด้วย KeyError
+    # จึงเช็คก่อนว่ามีที่ไหน แล้วค่อยเลือกใช้ ถ้าไม่มีทั้งคู่ก็ข้ามหัวข้อนี้ไปเงียบ ๆ
+    # ไม่ให้หน้าจอแดงตอนนำเสนอ
+    if "meal_start_min" in groups.columns:
+        early_groups = groups[
+            (groups["meal_start_min"] >= 6 * 60) &
+            (groups["meal_start_min"] < 7 * 60)
+        ]
+    elif "meal_start_min" in units.columns:
+        # units เก็บรายหน่วยโต๊ะ กลุ่มที่ใช้ 2 โต๊ะจะมี 2 แถว
+        # ต้อง dedupe ด้วย service_no ไม่งั้นจะนับกลุ่มซ้ำ
+        early_groups = units[
+            (units["meal_start_min"] >= 6 * 60) &
+            (units["meal_start_min"] < 7 * 60)
+        ]
+        if "service_no" in early_groups.columns:
+            early_groups = early_groups.drop_duplicates(subset=["service_no"])
+    else:
+        early_groups = groups.iloc[0:0]
+
+    n_early = len(early_groups)
+    if n_early > 0 and "guest_type" in early_groups.columns:
+        early_walkins = int((early_groups["guest_type"] == "Walk in").sum())
+        early_note = (
+            f"\n5. **Guest-type label consistency:** Of the **{n_early} groups** whose meal "
+            f"started between 06:00 and 06:59, **{early_walkins} "
+            f"({early_walkins / n_early * 100:.0f}%)** are labelled Walk in. The count is "
+            "valid, but the reason behind this pattern cannot be observed in the dataset. "
+            "Front-of-house should confirm that the labels follow the appendix definition "
+            "before guest type is used for operational targeting."
+        )
+        n_questions = "five"
+    else:
+        early_note = ""
+        n_questions = "four"
 
     st.markdown(f"""### Remaining Data Blind Spots & Business Limitations
 
-Despite cleaning the dataset, five key questions require additional evidence:
+Despite cleaning the dataset, {n_questions} key questions require additional evidence:
 
 1. **Missing days:** Why are Monday and Thursday absent, and are these five days representative of normal demand?
 2. **Physical capacity:** What are the confirmed table configurations, seat counts, and the status of table 16 and 15A/15B?
 3. **Guest experience:** Why did each group leave, and what satisfaction or complaint outcome followed the wait?
-4. **Commercial sustainability:** Which guests actually paid the buffet price, and what were revenue, food cost, labour cost, and contribution margin?
-5. **Guest-type label consistency:** Of the **{len(early_groups)} groups** whose meal started between 06:00 and 06:59, **{early_walkins} ({early_walkins / len(early_groups) * 100:.0f}%)** are labelled Walk in. The count is valid, but the reason behind this pattern cannot be observed in the dataset. Front-of-house should confirm that the labels follow the appendix definition before guest type is used for operational targeting.""")
+4. **Commercial sustainability:** Which guests actually paid the buffet price, and what were revenue, food cost, labour cost, and contribution margin?{early_note}""")
 
     with st.expander("View the cleaned dataset"):
         st.dataframe(groups, width='stretch')
