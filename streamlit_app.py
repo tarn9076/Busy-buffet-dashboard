@@ -49,7 +49,6 @@ COLOR_GUEST = {"In house": "#2E86AB", "Walk in": "#F18F01"}
 RED = "#D64545"
 
 
-@st.cache_data
 def load():
     """โหลดไฟล์ที่ผ่าน cleaning pipeline (clean_data.py) มาแล้ว"""
     g = pd.read_csv("clean_groups.csv")
@@ -70,7 +69,6 @@ groups, units = load()
 # แล้วไล่ทุกกลุ่ม บวก +1 ลงในทุกนาทีที่โต๊ะถูกครอง
 # ทำแบบนี้เพราะคำถาม "ตอน 9 โมงมีกี่โต๊ะถูกใช้" ตอบได้ตรงกว่าการเฉลี่ยรายชั่วโมง
 
-@st.cache_data
 def occupancy_curve(day, cap_minutes=None):
     """คืน array 1440 ช่อง = จำนวนหน่วยโต๊ะที่ถูกครองในแต่ละนาที
     cap_minutes: ถ้าใส่ จะจำลองว่าบังคับให้ลุกภายในกี่นาที (ใช้ simulate Action 1)
@@ -87,7 +85,6 @@ def occupancy_curve(day, cap_minutes=None):
     return grid
 
 
-@st.cache_data
 def queue_curve(day):
     """คืน array 1440 ช่อง = จำนวนกลุ่มที่ยืนรออยู่ในคิวแต่ละนาที"""
     sub = groups[(groups["day"] == day) & (groups["has_queue"])].dropna(
