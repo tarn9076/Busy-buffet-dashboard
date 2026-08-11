@@ -12,7 +12,7 @@ ATMIND Data Analytics Test 2026
     Tab 0 : Overview + ข้อจำกัดของข้อมูล
     Tab 1 : Task 1 - พิสูจน์คำพูดพนักงาน 3 ข้อ
     Tab 2 : Task 2 - หักล้างมาตรการ 3 ข้อ
-    Tab 3 : Task 3 - ข้อเสนอ (Plan A / Plan B)
+    Tab 3 : Task 3 - ข้อเสนอเดียวแบบ conditional priority
     Tab 4 : Assumptions & Data Quality
 
 [กฎเหล็ก - ห้ามลืม]
@@ -54,16 +54,13 @@ def load():
     """โหลดไฟล์ที่ผ่าน cleaning pipeline (clean_data.py) มาแล้ว"""
     g = pd.read_csv("clean_groups.csv")
     u = pd.read_csv("clean_units.csv")
-    inv = pd.read_csv("table_inventory.csv")
     # แปลงชื่อวันเป็นอังกฤษตั้งแต่ตอนโหลด จะได้ไม่ต้องแปลงซ้ำทุกกราฟ
     g["day"] = g["day_label"].map(DAY_MAP)
     u["day"] = u["day_label"].map(DAY_MAP)
-    return g, u, inv
+    return g, u
 
 
-groups, units, inventory = load()
-TOTAL_UNITS = len(inventory)          # 32 หน่วยโต๊ะ = ตัวหารของ occupancy
-TOTAL_SEATS = int(inventory["seats"].sum())
+groups, units = load()
 
 
 # --------------------------------------------------------------------------
@@ -122,19 +119,22 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs(
 # TAB 0 : Overview
 # ==========================================================================
 with tab0:
+    queued_groups = int(groups["has_queue"].sum())
+    walkaway_groups = int(groups["is_walkaway"].sum())
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Groups served", f"{len(groups):,}")
-    c2.metric("Total guests", f"{groups['pax'].sum():,.0f}")
+    c1.metric("Groups analysed", f"{len(groups):,}")
+    c2.metric("Recorded guests", f"{groups['pax'].sum():,.0f}")
     c3.metric("Median dining time", f"{groups['duration_min_clean'].median():.0f} min")
-    c4.metric("Seating capacity", f"{TOTAL_UNITS} tables · {TOTAL_SEATS} seats")
+    c4.metric("Queue outcome", f"{queued_groups} queued · {walkaway_groups} left")
 
     st.markdown("### Important Notes Before the Charts")
     # เอาข้อจำกัดขึ้นก่อนกราฟ เพราะถ้าคนเห็นกราฟก่อน จะตีความเกินกว่าที่ข้อมูลรองรับ
     st.markdown("""I found three main limitations in the data that affect the analysis below:
 
 1. **Incomplete week:** I only have data for 5 days instead of 7 (Monday, March 16, and Thursday are missing). Therefore, I cannot evaluate a full weekly trend.
-2. **Limited queue data:** Queue data is only available for 2 days (Saturday 14 and Sunday 15). All waiting-time insights are based solely on these two days.
-3. **Missing financial data:** There are no price or sales columns, so I cannot measure how guests react to pricing.""")
+2. **Queue interpretation:** Queue fields appear only on Saturday and Sunday. Following the dataset guide, blank queue fields are treated as direct seating; capture consistency remains a data-quality risk.
+3. **No satisfaction data:** Waiting and walk-away behaviour are observable, but the dataset cannot prove that guests were unhappy or explain why they left.
+4. **Missing financial data:** There are no actual sales, cost, or paid-cover fields, so pricing impact cannot be measured directly.""")
 
     st.divider()
     st.markdown("### How busy was each day")
@@ -161,7 +161,7 @@ with tab0:
     st.markdown("""Weekend demand is 40% higher than weekdays (averaging **160** vs. **114** guests per day). This clear jump means we need different staffing and table preparation for weekends.""")
 
     st.caption(
-        "Note: queue data was only recorded on Saturday 14 and Sunday 15.")
+        "Queue records appear only on Saturday and Sunday; blank queue fields are treated as direct seating according to the task guide.")
 
 
 # ==========================================================================
@@ -175,14 +175,18 @@ with tab1:
     st.markdown(
         "> *In-house guests are unhappy that they have to wait for a table. "
         "Walk-in customers also queue for a long time and leave.*")
-    st.markdown("### Answer: True — but the root cause is guest expectation, not just wait time")
+    st.markdown("### Answer: Partially supported — the operational symptoms are visible, but dissatisfaction is not measured")
 
-    q = groups[(groups["queue_data_available"]) & (groups["has_queue"])]
+    q = groups[groups["has_queue"]]
     t = (q.groupby("guest_type")
          .agg(queued=("service_no", "size"),
               walkaway=("is_walkaway", "sum"),
               med_wait=("wait_min", "median")).reset_index())
     t["walkaway_rate"] = (t["walkaway"] / t["queued"] * 100).round(1)
+    t["med_wait"] = t["med_wait"].round(1)
+    queue_metrics = t.set_index("guest_type")
+    ih = queue_metrics.loc["In house"]
+    wi = queue_metrics.loc["Walk in"]
 
     c1, c2 = st.columns(2)
     with c1:
@@ -202,13 +206,11 @@ with tab1:
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, width='stretch')
 
-    st.error("""**My Analysis & Key Takeaway:**
+    st.info(f"""**What the data supports:**
 
-The data reveals an interesting contrast: In-house guests wait much less than walk-ins (28 mins vs. 42.5 mins median), yet they abandon the queue almost twice as often (28.0% walk-away rate vs. 14.6%).
+Among {len(q)} queued groups, in-house guests had a median wait of **{ih['med_wait']:.0f} minutes** and a **{ih['walkaway_rate']:.1f}% group walk-away rate**. Walk-in guests waited longer at **{wi['med_wait']:.1f} minutes**, with a lower **{wi['walkaway_rate']:.1f}% group walk-away rate**.
 
-**Why this happens (Operational & Commercial view):** Wait time itself is not the main problem. In-house guests have already paid for their rooms, so they expect immediate seating for breakfast. They simply have a much lower wait tolerance than walk-in visitors.
-
-**Conclusion:** This is an expectation management issue, not a table capacity issue.""")
+**What the data cannot prove:** The file contains no satisfaction score, complaint reason, or reason for leaving. Therefore, it supports the waiting and walk-away concern, but it cannot prove that guests were unhappy or identify expectation as the root cause.""")
 
     st.dataframe(
         t.rename(columns={"guest_type": "Guest type", "queued": "Groups queued",
@@ -228,40 +230,39 @@ The data reveals an interesting contrast: In-house guests wait much less than wa
     rows = []
     for d in DAY_ORDER:
         curve = occupancy_curve(d)
-        window = curve[390:750]        # 06:30-12:30 ช่วงที่ให้บริการจริง
+        window = curve[390:750]        # ช่วงข้อมูลที่สังเกตอย่างสม่ำเสมอ 06:30-12:30
+        day_groups = groups[groups["day"] == d]
         rows.append({"day": d,
-                     "peak_pct": round(curve.max() / TOTAL_UNITS * 100, 1),
-                     "avg_pct": round(window.mean() / TOTAL_UNITS * 100, 1),
+                     "peak_units": int(curve.max()),
+                     "avg_units": round(window.mean(), 1),
                      "peak_time": hhmm(curve.argmax()),
-                     "min_over75": int((curve >= 0.75 * TOTAL_UNITS).sum())})
+                     "queued_groups": int(day_groups["has_queue"].sum()),
+                     "walkaways": int(day_groups["is_walkaway"].sum())})
     occ_tbl = pd.DataFrame(rows)
 
     fig = go.Figure()
-    fig.add_bar(x=occ_tbl["day"], y=occ_tbl["peak_pct"], name="Peak of the day",
-                marker_color="#B8D8E8", text=occ_tbl["peak_pct"], textposition="outside")
-    fig.add_bar(x=occ_tbl["day"], y=occ_tbl["avg_pct"], name="Average while open",
-                marker_color="#2E86AB", text=occ_tbl["avg_pct"], textposition="outside")
-    # เส้น 75% = ระดับที่ร้านอาหารทั่วไปถือว่าเริ่มแน่น
-    fig.add_hline(y=75, line_dash="dash", line_color=RED,
-                  annotation_text="75% — a restaurant starts to feel full here")
-    fig.update_layout(barmode="group", title="Table usage by day (%)",
-                      yaxis_title="% of 32 tables", xaxis_title="")
+    fig.add_bar(x=occ_tbl["day"], y=occ_tbl["peak_units"], name="Peak occupied units",
+                marker_color="#B8D8E8", text=occ_tbl["peak_units"], textposition="outside")
+    fig.add_bar(x=occ_tbl["day"], y=occ_tbl["avg_units"], name="Average occupied units",
+                marker_color="#2E86AB", text=occ_tbl["avg_units"], textposition="outside")
+    fig.update_layout(barmode="group", title="Estimated occupied table units by day",
+                      yaxis_title="Occupied table units", xaxis_title="")
     st.plotly_chart(fig, width='stretch')
 
     c1, c2 = st.columns([2, 1])
     with c1:
-        st.markdown("""**My Findings on Table Utilization:**
+        st.markdown("""**What the five observed days show:**
 
-**Weekdays are under-utilized:** Friday and Tuesday never reach our 75% busy threshold. On average, Friday sits at only 26.8% occupancy, meaning half the restaurant remains empty for 5.5 hours.
+Demand is not equally busy every day. Recorded queues and walk-aways appear only on Saturday and Sunday, with Sunday showing the largest operational pressure.
 
-**Peak crowding is temporary:** Sunday touches 90% occupancy, but only for 3 minutes.
+The occupied-unit estimate also varies by day, but it is intentionally shown as a count rather than a utilization percentage because the appendix does not confirm total physical capacity and the source contains undocumented table identifiers.
 
-**When we are actually busy:** The restaurant only experiences true crowding on Saturday and Sunday between 09:00 and 10:30, not every day.""")
+**Conclusion:** The statement “busy every day” is not supported by this five-day sample. However, staffing, cost, and profit data are missing, so the claim that the business is unsustainable cannot be tested.""")
     with c2:
         st.dataframe(
-            occ_tbl.rename(columns={"day": "Day", "peak_pct": "Peak %",
-                                    "avg_pct": "Avg %", "peak_time": "Peak time",
-                                    "min_over75": "Min above 75%"}),
+            occ_tbl.rename(columns={"day": "Day", "peak_units": "Peak units",
+                                    "avg_units": "Avg units", "peak_time": "Peak time",
+                                    "queued_groups": "Queued", "walkaways": "Walk-away"}),
             width='stretch', hide_index=True)
 
     st.caption("""**Data Limitation Note:** I only have data for 5 out of 7 days. While I can clearly see that daily demand varies significantly, I cannot draw conclusions about Monday or Thursday.""")
@@ -289,34 +290,33 @@ The data reveals an interesting contrast: In-house guests wait much less than wa
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, width='stretch')
     with c2:
-        st.metric("Guests who stayed over 5 hours", "0", delta="out of 347",
+        st.metric("Groups over 5 hours", "0", delta=f"out of {len(dur)} valid records",
                   delta_color="off")
         st.metric("Longest stay in the whole file", "225 min",
                   delta="3 hours 45 minutes", delta_color="off")
         st.metric("Median stay", "52 min", delta="17% of the 5 hours allowed",
                   delta_color="off")
 
-    st.markdown("""**The Reality of Dining Duration:**
+    long_groups = int((dur["duration_min_clean"] > 150).sum())
+    st.markdown(f"""**The Reality of Dining Duration:**
 
-The restaurant is open for 7 hours (06:26 to 13:30), meaning a 5-hour dining limit covers 71% of our total opening time.
+Observed meal activity runs from 06:26 to 13:30. This is the observed data window, not a confirmed operating-hours schedule.
 
-To even attempt a 5-hour stay, a guest must arrive before 08:30 (only 40.5% of guests arrive that early).
-
-**Nobody stayed the whole day:** The longest individual stay in the entire dataset was 225 minutes (3 hours 45 minutes). Only 8 guests (2.3%) stayed longer than 2.5 hours.""")
+**Nobody used the full 5-hour allowance:** The longest valid group stay was 225 minutes (3 hours 45 minutes). Only **{long_groups} groups ({long_groups / len(dur) * 100:.1f}%)** stayed longer than 2.5 hours.""")
 
     st.success("""**What Staff Correctly Observed:**
 
 Walk-in guests do stay 1.7 times longer than in-house guests (median 66 minutes vs. 38.5 minutes).
 
-While walk-in groups make up only 57% of total groups, they consume 70% of total table-minutes.
+While walk-in groups make up 57% of valid dining records, they account for about 69% of observed dining minutes.
 
-**Conclusion:** Staff accurately sensed that walk-ins occupy tables longer and slow down table turnover, but the perception that they "sit the whole day" is an exaggeration.""")
+**Conclusion:** Staff accurately sensed that walk-ins have longer dining durations, which can reduce turnover during a peak. However, the perception that they "sit the whole day" is an exaggeration.""")
 
-    share = (units.dropna(subset=["duration_min_clean"])
+    share = (groups.dropna(subset=["duration_min_clean"])
              .groupby("guest_type")["duration_min_clean"].sum().reset_index())
     fig = px.pie(share, names="guest_type", values="duration_min_clean", hole=0.45,
                  color="guest_type", color_discrete_map=COLOR_GUEST,
-                 title="Share of total table-minutes")
+                 title="Share of observed dining minutes")
     st.plotly_chart(fig, width='stretch')
 
 
@@ -324,11 +324,11 @@ While walk-in groups make up only 57% of total groups, they consume 70% of total
 # TAB 2 : Task 2
 # ==========================================================================
 with tab2:
-    st.header("Task 2 — Why each proposed action will not work")
+    st.header("Task 2 — Why each proposed action may fail as a blanket rule")
 
     # ---------------- ACTION 1 ----------------
     st.markdown("## Action 1 — Cut the seating time from 5 hours")
-    st.markdown("### It tries to solve a problem that does not exist")
+    st.markdown("### The current 5-hour allowance is not the binding constraint")
 
     d = groups["duration_min_clean"].dropna()
     caps = [300, 240, 180, 120, 90, 60]
@@ -355,28 +355,30 @@ with tab2:
 
 Reducing the limit from 5 to 4 hours has zero impact. My analysis shows that no one stays that long anyway.
 
-To actually free up tables, I would have to drop the time limit drastically to 90 minutes, which would negatively affect 59 groups (17% of all guests).""")
+To materially change dining behaviour, the limit would need to fall to 90 minutes. That would affect 59 groups, or 17% of the 347 valid dining records—not 17% of individual guests.""")
 
     # จำลองว่าถ้าบังคับ 90 นาที peak จะลดแค่ไหน
     sim = []
     for dd in DAY_ORDER:
         base = occupancy_curve(dd).max()
         capped = occupancy_curve(dd, cap_minutes=90).max()
-        sim.append({"day": dd, "before": round(base / TOTAL_UNITS * 100, 1),
-                    "after": round(capped / TOTAL_UNITS * 100, 1)})
-    sim_long = pd.DataFrame(sim).melt(id_vars="day", var_name="scenario", value_name="pct")
+        sim.append({"day": dd, "before": int(base), "after": int(capped)})
+    sim_df = pd.DataFrame(sim)
+    sim_long = sim_df.melt(id_vars="day", var_name="scenario", value_name="units")
     sim_long["scenario"] = sim_long["scenario"].map(
         {"before": "Today", "after": "With a 90-minute limit"})
 
-    fig = px.bar(sim_long, x="day", y="pct", color="scenario", barmode="group", text="pct",
-                 title="What a strict 90-minute limit would do to the busiest moment",
-                 labels={"day": "", "pct": "Peak table usage (%)", "scenario": ""},
+    fig = px.bar(sim_long, x="day", y="units", color="scenario", barmode="group", text="units",
+                 title="Estimated effect of a 90-minute limit on the daily peak",
+                 labels={"day": "", "units": "Peak occupied table units", "scenario": ""},
                  color_discrete_map={"Today": "#B8D8E8",
                                      "With a 90-minute limit": "#2E86AB"})
     fig.update_traces(textposition="outside")
     st.plotly_chart(fig, width='stretch')
 
-    st.markdown("""**Minimal results during peak hours:** Even with a strict 90-minute limit, Friday occupancy stays unchanged at 59.4%, and Sunday peak usage only drops slightly from 90.6% to 87.5%. Disrupting 1 in 6 guests for such a tiny gain is not worth the operational friction.""")
+    sun_before = int(sim_df.loc[sim_df["day"] == "Sun 15 Mar", "before"].iloc[0])
+    sun_after = int(sim_df.loc[sim_df["day"] == "Sun 15 Mar", "after"].iloc[0])
+    st.markdown(f"""**Limited peak impact in this simplified scenario:** The Sunday peak falls from an estimated **{sun_before} to {sun_after} occupied table units**, while 59 groups would be affected by the rule. The simulation only truncates recorded meal duration; it does not model cleaning time, guest reaction, or party-to-table matching. Therefore, a blanket time limit is not supported as a stand-alone solution.""")
 
     st.divider()
 
@@ -386,24 +388,20 @@ To actually free up tables, I would have to drop the time limit drastically to 9
 
     st.markdown("""**Note:** Since I do not have historical price elasticity or sales data, I calculated a break-even threshold instead: How many guests can we afford to lose before total revenue drops?""")
 
-    walkin = groups[groups["guest_type"] == "Walk in"]
     be = []
     for dd in DAY_ORDER:
-        sub = walkin[walkin["day"] == dd]
         price = int(groups[groups["day"] == dd]["menu_price"].iloc[0])
-        pax = sub["pax"].sum()
         be.append({"day": dd, "price": price,
                    "increase_pct": round((259 / price - 1) * 100, 1),
-                   "breakeven_pct": round((1 - price / 259) * 100, 1),
-                   "revenue": int(pax * price)})
+                   "breakeven_pct": round((1 - price / 259) * 100, 1)})
     be = pd.DataFrame(be)
 
     c1, c2 = st.columns(2)
     with c1:
         fig = px.bar(be, x="day", y="breakeven_pct", text="breakeven_pct",
                      color="price", color_continuous_scale=[RED, "#2E86AB"],
-                     title="How many guests we can lose before we make less money",
-                     labels={"day": "", "breakeven_pct": "% we can afford to lose",
+                     title="Maximum promotion-volume loss before simplified revenue declines",
+                     labels={"day": "", "breakeven_pct": "Break-even volume loss (%)",
                              "price": "Current price"})
         fig.update_traces(texttemplate="%{text}%", textposition="outside")
         st.plotly_chart(fig, width='stretch')
@@ -411,15 +409,14 @@ To actually free up tables, I would have to drop the time limit drastically to 9
         st.dataframe(
             be.rename(columns={"day": "Day", "price": "Price now",
                                "increase_pct": "Increase (%)",
-                               "breakeven_pct": "Can lose (%)",
-                               "revenue": "Revenue now (THB)"}),
+                               "breakeven_pct": "Can lose (%)"}),
             width='stretch', hide_index=True)
 
     st.markdown("""**Why this fails (Commercial View):**
 
-**Problem 1: High financial risk.** Raising weekday prices from 159 to 259 THB (+63%) means if we lose more than 38.6% of weekday volume, we will actively lose money. On weekends, our margin for error is even tighter (23.2% max volume loss).
+**Problem 1: Unknown demand response.** Under a simplified promotion-revenue calculation, raising weekday prices from 159 to 259 THB (+63%) can tolerate a maximum 38.6% volume loss before revenue declines. On weekends, the break-even loss is only 23.2%. The dataset contains no elasticity evidence to show which outcome is likely.
 
-**Problem 2: It targets the wrong days.** This price hike lands heaviest on weekdays when tables are already 59% to 73% empty. We would be charging more during our slowest periods, while failing to solve the overcrowding problem on weekends.""")
+**Problem 2: It targets every day even though the recorded queue problem is concentrated on the weekend.** A blanket increase may reduce demand on days that show no recorded queue, without guaranteeing that weekend waiting will fall enough.""")
 
     st.caption("""**Analytical Note:** Weekends are currently priced 25% higher and bring in more guests. However, because price and day-of-week always move together in this dataset, I cannot separate whether guests care more about the price or simply prefer weekend dining.""")
 
@@ -427,15 +424,15 @@ To actually free up tables, I would have to drop the time limit drastically to 9
 
     # ---------------- ACTION 3 ----------------
     st.markdown("## Action 3 — Let in-house guests skip the queue")
-    st.markdown("### Good in theory, but impractical for daily operations")
+    st.markdown("### A permanent daily rule shifts the problem instead of removing it")
 
     qdays = []
     for dd in DAY_ORDER:
-        has_data = bool(groups[groups["day"] == dd]["queue_data_available"].iloc[0])
+        has_data = bool(groups[groups["day"] == dd]["has_queue"].any())
         qc = queue_curve(dd)
         qdays.append({"day": dd,
                       "max_queue": int(qc.max()) if has_data else None,
-                      "status": "Recorded" if has_data else "Not recorded"})
+                      "status": "Queue recorded" if has_data else "Direct seating under guide"})
     qdays = pd.DataFrame(qdays)
 
     c1, c2, c3 = st.columns(3)
@@ -448,149 +445,117 @@ To actually free up tables, I would have to drop the time limit drastically to 9
                               "status": "Queue data"}),
         width='stretch', hide_index=True)
 
-    st.markdown("""**Why this fails (Operational View):**
+    st.markdown("""**Why a blanket daily rule may fail:**
 
-**Reason 1: It is useless on weekdays.** On 3 out of 5 recorded days, there is no queue to skip. Table utilization only reaches 59–78%, so priority seating adds no value.
+**Reason 1: It is inactive on days without a recorded queue.** Under the dataset guide, Friday, Tuesday, and Wednesday are treated as direct seating, so a daily priority rule adds no value on those observed days.
 
-**Reason 2: It just shifts the bottleneck.** On Sunday, 19 in-house groups and 35 walk-in groups waited in line. If in-house guests skip ahead, walk-in wait times will jump by ~54%. Since our total table capacity remains the same, we do not solve the wait time — we only make it worse for walk-in visitors.
+**Reason 2: It redistributes access rather than adding capacity.** On Sunday, 19 in-house and 35 walk-in groups queued. Moving in-house groups forward would likely transfer some delay to walk-ins, but the size of that impact cannot be quantified without a priority-queue simulation or pilot.
 
-**Reason 3: Operations cannot easily identify guest types at the door.** A guest who booked a room without breakfast and pays at the door is recorded as a "Walk-in." Front-of-house staff cannot visually tell the difference during a busy rush.""")
+**Reason 3: It needs guardrails.** Unlimited queue-skipping could damage walk-in experience and increase their walk-away rate. The action is more defensible as a conditional, monitored rule than as permanent priority all day.""")
 
-    st.success("""**My Evidence from the Data:**
-
-Between 06:00 and 06:59 AM, outside visitors rarely arrive. Yet, the data shows 21 Walk-in groups and only 2 In-house groups during this early hour (Walk-ins = 91% of early arrivals).
-
-**Conclusion:** In this dataset, "Walk-in" likely indicates how the guest paid (e.g., paying at the door rather than pre-booking breakfast with the room), rather than whether they are actually staying at the hotel.""")
+    st.info("""**Conclusion:** The data does not support permanent queue-skipping every day. It does support testing a limited priority rule during an active queue, while tracking outcomes for both guest types.""")
 
 
 # ==========================================================================
 # TAB 3 : Task 3
 # ==========================================================================
 with tab3:
-    st.header("Task 3 — What I would do instead")
+    st.header("Task 3 — Recommended action")
 
-    st.markdown("""### Keep Action 3, but only turn it on when it is needed
+    st.markdown("""### Test conditional in-house priority when the active queue reaches 5 groups
 
-**Why I focused on Action 3:** Of the three proposed actions, this is the only one that addresses a real operational issue in the data. In-house guests abandon the queue 28% of the time, even though their median wait is shorter than walk-ins. The other two actions try to solve problems that the data does not support.""")
+This is a modified version of Action 3—not permanent queue-skipping. It activates only during a visible queue and is designed as a monitored pilot. The goal is to protect the hotel-guest experience without applying a price increase or time restriction to every customer.""")
 
-    st.markdown("### Choosing the right trigger")
+    st.markdown("### When would the rule activate?")
 
-    day_pick = st.selectbox("Pick a day", ["Sun 15 Mar", "Sat 14 Mar"], index=0)
-    occ = occupancy_curve(day_pick)
+    day_pick = st.selectbox("Pick a queue day", ["Sun 15 Mar", "Sat 14 Mar"], index=0)
     qc = queue_curve(day_pick)
     x = list(range(6 * 60, 14 * 60))
+    active_minutes = int((qc >= 5).sum())
+    max_queue = int(qc.max())
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=[hhmm(m) for m in x],
-                             y=[occ[m] / TOTAL_UNITS * 100 for m in x],
-                             name="Table usage (%)",
-                             line=dict(color="#2E86AB", width=2)))
     fig.add_trace(go.Scatter(x=[hhmm(m) for m in x], y=[qc[m] for m in x],
-                             name="Groups waiting", yaxis="y2",
-                             line=dict(color="#F18F01", width=2)))
-    fig.add_hline(y=80, line_dash="dot", line_color="#999",
-                  annotation_text="The idea I dropped: 80% table usage")
+                             name="Groups waiting",
+                             line=dict(color="#F18F01", width=3), fill="tozeroy"))
+    fig.add_hline(y=5, line_dash="dash", line_color=RED,
+                  annotation_text="Pilot trigger: 5 groups")
     fig.update_layout(
-        title=f"{day_pick} — table usage against queue length",
-        xaxis_title="Time",
-        yaxis=dict(title="Table usage (%)", range=[0, 100]),
-        yaxis2=dict(title="Groups waiting", overlaying="y", side="right",
-                    range=[0, 25], showgrid=False),
-        legend=dict(orientation="h", y=1.12), height=430)
+        title=f"{day_pick} — active queue by minute",
+        xaxis_title="Time", yaxis_title="Groups waiting",
+        yaxis_range=[0, max(10, max_queue + 2)], height=430,
+        showlegend=False)
     fig.update_xaxes(tickmode="array",
                      tickvals=[hhmm(m) for m in range(6 * 60, 14 * 60, 60)])
     st.plotly_chart(fig, width='stretch')
 
-    st.error("""**Why I dropped the 80% Table Usage trigger:**
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Pilot trigger", "5 groups")
+    c2.metric("Maximum recorded queue", f"{max_queue} groups")
+    c3.metric("Rule active on selected day", f"{active_minutes} minutes")
 
-**My initial assumption:** I considered activating priority seating whenever table occupancy hit 80%. However, the data disproved this approach.
-
-**The data mismatch:** At 09:00 on Sunday, 15 groups were waiting, but table usage showed only 71.9% (so the rule would stay OFF). At 11:30, usage showed 81.2% (rule turns ON), but only 1 group was waiting.
-
-**The operational reality:** A table that appears "empty" in the system is often not ready for seating. Staff still need time to clear, clean, and reset the table (turnover lag). Therefore, table occupancy percentage is a poor trigger for queue management.""")
+    st.caption("Queue length is used as the trigger because it is directly observable. Total physical table capacity and cleaning/reset time are not confirmed in the dataset.")
 
     st.divider()
-    st.markdown("## Plan A — turn it on when 5 or more groups are waiting")
+    st.markdown("## Evidence for the 5-group working threshold")
 
-    q2 = groups[(groups["queue_data_available"]) & (groups["has_queue"])].dropna(
-        subset=["queue_start_min"]).copy()
+    q2 = groups[groups["has_queue"]].dropna(
+        subset=["queue_start_min", "queue_end_min", "wait_min"]).copy()
 
-    # หา "ตอนกลุ่มนี้มาถึง มีคนรออยู่ในคิวกี่กลุ่ม"
+    # นับเฉพาะกลุ่มที่เริ่มรอก่อนกลุ่มปัจจุบันและยังไม่ออกจากคิว ไม่รวมตัวเอง
     def qlen_at_arrival(row):
         same_day = q2[q2["day"] == row["day"]]
         t = row["queue_start_min"]
-        return int(((same_day["queue_start_min"] <= t) &
+        return int(((same_day["queue_start_min"] < t) &
                     (same_day["queue_end_min"] > t)).sum())
 
     q2["qlen"] = q2.apply(qlen_at_arrival, axis=1)
     q2["bucket"] = pd.cut(q2["qlen"], [-1, 2, 4, 6, 9, 99],
                           labels=["0-2", "3-4", "5-6", "7-9", "10+"])
-    bk = (q2.groupby("bucket", observed=True)
+    bk = (q2.groupby("bucket", observed=False)
           .agg(n=("service_no", "size"), med_wait=("wait_min", "median")).reset_index())
+    bk["med_wait"] = bk["med_wait"].round(1)
 
     c1, c2 = st.columns([3, 2])
     with c1:
         fig = px.bar(bk, x="bucket", y="med_wait", text="med_wait",
-                     title="How long guests waited, based on the queue size when they arrived",
-                     labels={"bucket": "Groups already in the queue", "med_wait": "Minutes waited"})
+                     title="Observed wait by groups already in the queue at arrival",
+                     labels={"bucket": "Groups already waiting", "med_wait": "Median wait (minutes)"})
         fig.update_traces(textposition="outside", marker_color="#2E86AB")
         fig.add_vrect(x0=1.5, x1=2.5, fillcolor="#E8A33D", opacity=0.18, line_width=0,
-                      annotation_text="wait doubles here")
+                      annotation_text="working trigger")
         st.plotly_chart(fig, width='stretch')
     with c2:
         st.dataframe(
-            bk.rename(columns={"bucket": "Queue length", "n": "Sample size",
+            bk.rename(columns={"bucket": "Groups ahead", "n": "Queued groups",
                                "med_wait": "Median wait (min)"}),
             width='stretch', hide_index=True)
-        st.metric("First jump", "5 groups", delta="wait doubles: 11.5 to 22 min",
-                  delta_color="off")
-        st.metric("Second jump", "10 groups", delta="wait goes 4x: up to 45 min",
-                  delta_color="off")
+        trigger_row = bk[bk["bucket"].astype(str) == "5-6"].iloc[0]
+        st.metric("Observed at 5–6 ahead", f"{trigger_row['med_wait']:.0f} min median",
+                  delta=f"n = {int(trigger_row['n'])} queued groups", delta_color="off")
 
-    st.markdown("""**Why I selected a 5-group threshold:**
+    st.info("""**Why this is a pilot threshold—not a proven tipping point:** Median wait rises as the queue becomes longer, and a five-group trigger is simple for a hostess to observe using queue cards. However, the 5–6 group bucket is small and all queue evidence comes from only two days. The threshold must be validated and adjusted during the pilot.""")
 
-**Why not use walk-away rates?** Only 25 in-house groups ever queued in the dataset, and 7 left. A sample size of 7 is too small for statistical confidence.
+    st.markdown("""### Operating rule
 
-**Using median wait time instead:** Wait time provides a much steadier trend. When the line reaches 5 groups, the median wait doubles from 11.5 to 22 minutes. When it hits 10 groups, the wait jumps 4x to 45 minutes. Therefore, 5 groups is the critical tipping point where intervention is needed.
+1. Keep normal first-come-first-served seating while fewer than 5 groups are waiting.
+2. At 5 or more groups, verify in-house status using the hotel's normal room/name check.
+3. Seat one compatible in-house group at the next suitable table, then seat the next compatible walk-in group before using priority again.
+4. Turn the rule off once the active queue falls below 5 groups.
 
-**Why Plan A works for Operations:**
+The alternating guardrail prevents unlimited queue-skipping and makes the impact on walk-in guests measurable.""")
 
-**Zero system reliance:** Hostesses can trigger this rule visually by counting physical queue cards — no math or software required.
+    st.markdown("""### Two-weekend pilot and success measures
 
-**Targeted activation:** Based on weekend data, this rule would only activate for 33 minutes on Saturday and 173 minutes on Sunday. On weekdays, it remains inactive.
+Track the following before and during the pilot:
 
-**Guest-facing clarity:** It reacts to what guests actually experience (length of the line), rather than an invisible table percentage.""")
+- In-house median and P90 wait time
+- In-house group walk-away rate
+- Walk-in median/P90 wait and group walk-away rate
+- Seated guests per hour
+- Complaints or satisfaction feedback by guest type
 
-    st.divider()
-    st.markdown("## Plan B — keep 6 tables free for hotel guests during the rush")
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Tables to keep free", "6 tables", delta="18.8% of 32", delta_color="off")
-    c2.metric("What hotel guests really used", "6 tables",
-              delta="same on Sat and Sun", delta_color="off")
-    c3.metric("Still free for walk-ins", "26 tables", delta="they never used more than 23",
-              delta_color="off")
-
-    st.markdown("""**When to deploy Plan B instead:**
-
-**The identification barrier:** If front-of-house staff cannot easily distinguish room-only guests from external visitors at the door, Plan A will fail. Misidentified hotel guests would be sent to the back of the line, leading to front-desk complaints.
-
-**The operational solution:** Plan B bypasses door identification entirely by reserving a dedicated buffer of 6 tables for in-house breakfast guests during peak rush hours (08:30 – 11:00).
-
-**Why 6 tables?** My analysis shows that 6 tables (18.8% of capacity) is the maximum concurrent demand from in-house guests between 08:30 and 11:00 on both Saturday and Sunday. This still leaves 26 tables for walk-ins, who never exceeded 23 concurrent tables in the dataset.""")
-
-    st.divider()
-    st.markdown("""### Data Limitation Note
-
-All queue thresholds are derived from just 2 days of weekend queue data (73 groups total). While this provides the best analytical starting point available, it should be treated as a working baseline rather than a permanent rule.
-
-**My Recommended Action Plan:**
-
-**Test & Iterate:** Implement Plan A (or Plan B) as a two-week operational pilot.
-
-**Data Collection:** Consistently record daily queue lengths and wait times during the trial.
-
-**Success Metric:** Evaluate success by comparing the new walk-away rate against our current 28% baseline for in-house guests, and refine the threshold accordingly.""")
+**Decision rule:** Continue only if in-house waiting or walk-away improves without a material deterioration in walk-in outcomes. The current 28% in-house walk-away rate is based on only 25 queued groups, so it is a working baseline—not a stable target.""")
 
 
 # ==========================================================================
@@ -599,26 +564,24 @@ All queue thresholds are derived from just 2 days of weekend queue data (73 grou
 with tab4:
     st.header("Assumptions & Data Quality Methodology")
 
-    st.markdown("""To deliver timely insights without delaying the project, I established clear, logical assumptions to address data anomalies and missing records. Every assumption listed below is backed by evidence found directly within the dataset.""")
+    st.markdown("""Source definitions are followed first. Where the file is ambiguous, assumptions are documented separately and are not presented as confirmed physical facts.""")
 
     st.markdown("### Assumptions")
     assumptions = pd.DataFrame([
         ["A-01", "Sheet names are day + month, so the data is 13–18 March 2026",
          "The 2026 calendar matches the Sat–Sun peak, and the last digit of each sheet name is the month"],
-        ["A-02", "Short table numbers follow a rule based on party size: 3 or more guests means the whole table",
-         "I tested three interpretations of the floor plan. This approach resulted in the fewest seating conflicts (26 vs. 37 overlapping pairs)."],
-        ["A-03", "Table 16 is a real table missing from the floor plan",
-         "It appears 24 times, 4–5 times every single day. A typo would not repeat that evenly"],
-        ["A-04", "Tables 15A and 15B are accepted as 2 seats each",
-         "Applies to only 5 rows (1.4%). I chose the interpretation that maintains realistic total seating capacity."],
-        ["A-05", "Total capacity is 32 tables and 74 seats",
-         "Floor plan from the appendix, plus table 16 and 15A/15B from A-03 and A-04"],
-        ["A-06", "The 3 days without queue data were not recorded, rather than having no queue",
-         "These days reached 59–78% table occupancy. It is operationally unrealistic that zero guests waited; the queue was simply unrecorded."],
-        ["A-07", "Service runs 06:26 to 13:30, about 7 hours",
-         "Taken from the earliest and latest times in the data, not from an industry standard"],
-        ["A-08", "'Walk in' may describe how the guest paid, not whether they stay at the hotel",
-         "Between 06:00 and 06:59 there are 21 Walk in groups against 2 In house (91%)"],
+        ["A-02", "Bare table numbers are mapped only to estimate occupied table units",
+         "The mapping is an analytical convenience for time-of-day comparison; it is not used to claim total physical capacity."],
+        ["A-03", "Table 16 is retained as an undocumented observed table identifier",
+         "It appears 24 times across all five days, but its physical size and capacity require hotel confirmation."],
+        ["A-04", "Table 15 and 15A/15B are treated as alternative recorded setups",
+         "The full and split labels are not added together to estimate total restaurant capacity."],
+        ["A-05", "Blank queue fields are treated as direct seating",
+         "This follows the dataset guide. Because three entire days are blank, capture consistency remains a limitation."],
+        ["A-06", "06:26 to 13:30 is the observed activity window",
+         "It is derived from the earliest and latest valid meal records, not assumed to be official operating hours."],
+        ["A-07", "Guest_type follows the appendix definition",
+         "In house means a hotel guest; Walk in means a visitor who came for breakfast."],
     ], columns=["Code", "Assumption", "Evidence"])
     st.dataframe(assumptions, width='stretch', hide_index=True)
 
@@ -633,7 +596,7 @@ with tab4:
     flag_count.columns = ["flag", "n_rows"]
 
     FLAG_EN = {
-        "DQ01_NO_QUEUE_DATA_THIS_DAY": "Day has no queue data recorded at all",
+        "DQ01_NO_QUEUE_DATA_THIS_DAY": "No queue recorded; treated as direct seating under the guide",
         "DQ04_BARE_TABLE_NO": "Table number written short, no A/B side given",
         "DQ03_TABLE16_NOT_IN_APPENDIX": "Table 16 is not in the floor plan",
         "DQ16_PAX_OVER_CAPACITY": "More guests than the table can seat",
@@ -646,6 +609,7 @@ with tab4:
         "DQ07_CROSS_ZONE_COMBINE": "Indoor and outdoor tables combined",
         "DQ10_MEALSTART_OUT_OF_HOURS": "Start time falls outside service hours",
         "DQ09_MEALEND_BEFORE_START": "End time is before start time",
+        "DQ17_QUEUE_MEAL_TIME_CONFLICT": "Queue times conflict with recorded meal start",
     }
     flag_count["Issue"] = flag_count["flag"].map(FLAG_EN)
     st.dataframe(
@@ -659,12 +623,12 @@ I removed only one unrecoverable row that lacked usable data. For all other anom
 
     st.markdown("""### Remaining Data Blind Spots & Business Limitations
 
-Despite cleaning the dataset, I identified four key questions that require operational clarification:
+Despite cleaning the dataset, four key questions require additional evidence:
 
-1. **Missing Operating Days:** Why are Monday (March 16) and Thursday completely missing from the schedule?
-2. **Inconsistent Data Capture:** Why was queue data omitted by floor staff on Friday, Tuesday, and Wednesday?
-3. **Revenue Categorization:** Do "in-house" guests pay for breakfast separately or is it included in their room rate? Additionally, how are room-only guests classified at the entrance?
-4. **Financial Accuracy:** Due to the absence of actual sales, cost, and pricing columns, all revenue numbers presented in this analysis are estimates.""")
+1. **Missing days:** Why are Monday and Thursday absent, and are these five days representative of normal demand?
+2. **Physical capacity:** What are the confirmed table configurations, seat counts, and the status of table 16 and 15A/15B?
+3. **Guest experience:** Why did each group leave, and what satisfaction or complaint outcome followed the wait?
+4. **Commercial sustainability:** Which guests actually paid the buffet price, and what were revenue, food cost, labour cost, and contribution margin?""")
 
     with st.expander("View the cleaned dataset"):
         st.dataframe(groups, width='stretch')
