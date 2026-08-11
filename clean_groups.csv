@@ -203,7 +203,7 @@
 2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,64,2.0,2.0,Walk in,09:47,11:03,587.0,663.0,76.0,True,11:03,11:43,663.0,703.0,40.0,40.0,True,False,7C,7C,1,2,Outdoor,True,True,False,True,False,False,
 2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,65,2.0,2.0,Walk in,09:57,11:05,597.0,665.0,68.0,True,,,,,,,False,False,,,0,0,,True,False,True,False,False,False,
 2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,66,4.0,4.0,Walk in,10:07,11:05,607.0,665.0,58.0,True,11:05,12:25,665.0,745.0,80.0,80.0,True,False,3,3A|3B,2,4,Indoor,True,True,False,True,False,False,DQ04_BARE_TABLE_NO
-2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,67,2.0,2.0,Walk in,10:15,10:06,615.0,606.0,-9.0,True,10:06,12:06,606.0,726.0,120.0,120.0,True,False,10A,10A,1,2,Outdoor,True,True,False,True,False,False,
+2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,67,2.0,2.0,Walk in,10:15,11:06,615.0,666.0,51.0,True,10:06,12:06,606.0,726.0,120.0,120.0,True,False,10A,10A,1,2,Outdoor,True,True,False,True,False,False,DQ17_QUEUE_MEAL_TIME_CONFLICT
 2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,68,2.0,2.0,Walk in,09:10,10:30,550.0,630.0,80.0,True,10:30,12:10,630.0,730.0,100.0,100.0,True,False,5B,5B,1,2,Indoor,True,True,False,True,False,False,
 2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,69,1.0,1.0,Walk in,10:23,11:09,623.0,669.0,46.0,True,11:09,12:20,669.0,740.0,71.0,71.0,True,False,4A,4A,1,2,Indoor,True,True,False,True,False,False,
 2026-03-15,อาทิตย์ 15/3,อาทิตย์,True,199,153,70,1.0,1.0,Walk in,10:24,11:09,624.0,669.0,45.0,True,11:09,12:10,669.0,730.0,61.0,61.0,True,False,8A,8A,1,2,Outdoor,True,True,False,True,False,False,
