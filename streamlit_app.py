@@ -222,7 +222,7 @@ Among {len(q)} queued groups, in-house guests had a median wait of **{ih['med_wa
     st.markdown(
         "> *We are very busy every day of the week. This buffet business is not "
         "possible for this hotel.*")
-    st.markdown("### Answer: False — based on the 5 days of available data")
+    st.markdown("### Answer: Not supported by the five observed days")
 
     rows = []
     for d in DAY_ORDER:
@@ -248,13 +248,13 @@ Among {len(q)} queued groups, in-house guests had a median wait of **{ih['med_wa
 
     c1, c2 = st.columns([2, 1])
     with c1:
-        st.markdown("""**What the five observed days show:**
+        st.markdown("""**Primary evidence — occupied table units:**
 
-Demand is not equally busy every day. Recorded queues and walk-aways appear only on Saturday and Sunday, with Sunday showing the largest operational pressure.
+Estimated occupied units were lower on Friday (**peak 19; average 8.6**) and Tuesday (**21; 12.1**) than Saturday (**26; 15.5**) and Sunday (**29; 18.0**). Wednesday was closer to weekend conditions (**peak 25; average 13.0**), so the pattern is not simply weekday versus weekend.
 
-The occupied-unit estimate also varies by day, but it is intentionally shown as a count rather than a utilization percentage because the appendix does not confirm total physical capacity and the source contains undocumented table identifiers.
+Recorded queues and walk-aways are supporting evidence only because queue-capture consistency remains uncertain. Occupied units are shown as counts rather than utilization percentages because the appendix does not confirm total physical capacity.
 
-**Conclusion:** The statement “busy every day” is not supported by this five-day sample. However, staffing, cost, and profit data are missing, so the claim that the business is unsustainable cannot be tested.""")
+**Conclusion:** The claim that the buffet is “very busy every day” is not supported by this five-day sample. However, staffing, cost, and profit data are missing, so whether the business is financially sustainable cannot be tested.""")
     with c2:
         st.dataframe(
             occ_tbl.rename(columns={"day": "Day", "peak_units": "Peak units",
@@ -321,11 +321,12 @@ While walk-in groups make up 57% of valid dining records, they account for about
 # TAB 2 : Task 2
 # ==========================================================================
 with tab2:
-    st.header("Task 2 — Why each proposed action may fail as a blanket rule")
+    st.header("Task 2 — Why the three actions should not be blanket daily policies")
+    st.error("**Decision:** Do not implement any of the three proposed actions as an all-day, every-day policy based on the available evidence.")
 
     # ---------------- ACTION 1 ----------------
     st.markdown("## Action 1 — Cut the seating time from 5 hours")
-    st.markdown("### The current 5-hour allowance is not the binding constraint")
+    st.markdown("### Decision: Reject as proposed — the 5-hour allowance is not the binding constraint")
 
     d = groups["duration_min_clean"].dropna()
     caps = [300, 240, 180, 120, 90, 60]
@@ -375,13 +376,13 @@ To materially change dining behaviour, the limit would need to fall to 90 minute
 
     sun_before = int(sim_df.loc[sim_df["day"] == "Sun 15 Mar", "before"].iloc[0])
     sun_after = int(sim_df.loc[sim_df["day"] == "Sun 15 Mar", "after"].iloc[0])
-    st.markdown(f"""**Limited peak impact in this simplified scenario:** The Sunday peak falls from an estimated **{sun_before} to {sun_after} occupied table units**, while 59 groups would be affected by the rule. The simulation only truncates recorded meal duration; it does not model cleaning time, guest reaction, or party-to-table matching. Therefore, a blanket time limit is not supported as a stand-alone solution.""")
+    st.markdown(f"""**Why the proposed action should be rejected:** The Sunday peak falls from an estimated **{sun_before} to {sun_after} occupied table units**, while 59 groups would be affected by a 90-minute rule. The simulation only truncates recorded meal duration; it does not model cleaning time, guest reaction, or party-to-table matching. The size of those effects requires a pilot, but this limitation does not change the decision that a blanket time limit is not supported as a stand-alone solution.""")
 
     st.divider()
 
     # ---------------- ACTION 2 ----------------
     st.markdown("## Action 2 — Raise the price to 259 every day")
-    st.markdown("### Too risky for revenue, and it penalizes the wrong days")
+    st.markdown("### Decision: Reject a daily 259 THB price — it targets lower-intensity days most heavily")
 
     st.markdown("""**Note:** Since I do not have historical price elasticity or sales data, I calculated a break-even threshold instead: How many guests can we afford to lose before total revenue drops?""")
 
@@ -409,11 +410,13 @@ To materially change dining behaviour, the limit would need to fall to 90 minute
                                "breakeven_pct": "Can lose (%)"}),
             width='stretch', hide_index=True)
 
-    st.markdown("""**Why this fails (Commercial View):**
+    st.markdown("""**Why the proposed action should be rejected (Commercial View):**
 
 **Problem 1: Unknown demand response.** Under a simplified promotion-revenue calculation, raising weekday prices from 159 to 259 THB (+63%) can tolerate a maximum 38.6% volume loss before revenue declines. On weekends, the break-even loss is only 23.2%. The dataset contains no elasticity evidence to show which outcome is likely.
 
-**Problem 2: It targets every day even though the recorded queue problem is concentrated on the weekend.** A blanket increase may reduce demand on days that show no recorded queue, without guaranteeing that weekend waiting will fall enough.""")
+**Problem 2: The largest price increase is imposed on lower-intensity days.** Friday and Tuesday have lower peak and average occupied units than Saturday and Sunday. A daily increase may therefore reduce demand where operational pressure is already lower, without guaranteeing that weekend waiting will fall enough.
+
+The exact demand loss cannot be quantified without elasticity data, but that uncertainty is a reason to pilot and measure—not a reason to adopt the blanket price.""")
 
     st.caption("""**Analytical Note:** Weekends are currently priced 25% higher and bring in more guests. However, because price and day-of-week always move together in this dataset, I cannot separate whether guests care more about the price or simply prefer weekend dining.""")
 
@@ -421,7 +424,7 @@ To materially change dining behaviour, the limit would need to fall to 90 minute
 
     # ---------------- ACTION 3 ----------------
     st.markdown("## Action 3 — Let in-house guests skip the queue")
-    st.markdown("### A permanent daily rule shifts the problem instead of removing it")
+    st.markdown("### Decision: Reject permanent daily priority — it shifts access without adding capacity")
 
     qdays = []
     for dd in DAY_ORDER:
@@ -442,11 +445,11 @@ To materially change dining behaviour, the limit would need to fall to 90 minute
                               "status": "Queue data"}),
         width='stretch', hide_index=True)
 
-    st.markdown("""**Why a blanket daily rule may fail:**
+    st.markdown("""**Why the proposed action should be rejected as a blanket daily rule:**
 
 **Reason 1: It is inactive on days without a recorded queue.** Under the dataset guide, Friday, Tuesday, and Wednesday are treated as direct seating, so a daily priority rule adds no value on those observed days.
 
-**Reason 2: It redistributes access rather than adding capacity.** On Sunday, 19 in-house and 35 walk-in groups queued. Moving in-house groups forward would likely transfer some delay to walk-ins, but the size of that impact cannot be quantified without a priority-queue simulation or pilot.
+**Reason 2: It redistributes access rather than adding capacity.** On Sunday, 19 in-house and 35 walk-in groups queued. Moving in-house groups forward would likely transfer some delay to walk-ins. The exact size of the impact requires a priority-queue simulation or pilot, but the action still does not create additional capacity.
 
 **Reason 3: It needs guardrails.** Unlimited queue-skipping could damage walk-in experience and increase their walk-away rate. The action is more defensible as a conditional, monitored rule than as permanent priority all day.""")
 
@@ -618,14 +621,21 @@ with tab4:
 
 I removed only one unrecoverable row that lacked usable data. For all other anomalies, I retained the records and assigned specific Data Quality (DQ) codes. This transparent approach preserves data integrity, allows future analysts to filter records intentionally, and ensures full auditability of my work.""")
 
-    st.markdown("""### Remaining Data Blind Spots & Business Limitations
+    early_groups = groups[
+        (groups["meal_start_min"] >= 6 * 60) &
+        (groups["meal_start_min"] < 7 * 60)
+    ]
+    early_walkins = int((early_groups["guest_type"] == "Walk in").sum())
 
-Despite cleaning the dataset, four key questions require additional evidence:
+    st.markdown(f"""### Remaining Data Blind Spots & Business Limitations
+
+Despite cleaning the dataset, five key questions require additional evidence:
 
 1. **Missing days:** Why are Monday and Thursday absent, and are these five days representative of normal demand?
 2. **Physical capacity:** What are the confirmed table configurations, seat counts, and the status of table 16 and 15A/15B?
 3. **Guest experience:** Why did each group leave, and what satisfaction or complaint outcome followed the wait?
-4. **Commercial sustainability:** Which guests actually paid the buffet price, and what were revenue, food cost, labour cost, and contribution margin?""")
+4. **Commercial sustainability:** Which guests actually paid the buffet price, and what were revenue, food cost, labour cost, and contribution margin?
+5. **Guest-type label consistency:** Of the **{len(early_groups)} groups** whose meal started between 06:00 and 06:59, **{early_walkins} ({early_walkins / len(early_groups) * 100:.0f}%)** are labelled Walk in. The count is valid, but the reason behind this pattern cannot be observed in the dataset. Front-of-house should confirm that the labels follow the appendix definition before guest type is used for operational targeting.""")
 
     with st.expander("View the cleaned dataset"):
         st.dataframe(groups, width='stretch')
