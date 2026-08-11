@@ -129,7 +129,7 @@ with tab0:
 
     st.markdown("### Important Notes Before the Charts")
     # เอาข้อจำกัดขึ้นก่อนกราฟ เพราะถ้าคนเห็นกราฟก่อน จะตีความเกินกว่าที่ข้อมูลรองรับ
-    st.markdown("""I found three main limitations in the data that affect the analysis below:
+    st.markdown("""I found four main limitations in the data that affect the analysis below:
 
 1. **Incomplete week:** I only have data for 5 days instead of 7 (Monday, March 16, and Thursday are missing). Therefore, I cannot evaluate a full weekly trend.
 2. **Queue interpretation:** Queue fields appear only on Saturday and Sunday. Following the dataset guide, blank queue fields are treated as direct seating; capture consistency remains a data-quality risk.
